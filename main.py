@@ -120,22 +120,36 @@ class MVTEC_Dataset(Dataset):
 
     def __getitem__(self, index: int):
         data = self.dataset[index]
+        # print(data)
         print(data[2])
+        orig_image = 3024
 
         image = cv2.imread(data[2])
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
         image /= 255.0
 
-        print(data[1])
+        # print(data[1])
+        # print(IMAGE_SIZE)
 
         bbox = list(data[1])
-        print(bbox)
-        bbox[0] = bbox[0] * IMAGE_SIZE - bbox[2] * 0.12
-        bbox[1] = bbox[1] * IMAGE_SIZE - bbox[3] * 0.12
-        bbox[2] = bbox[2] * IMAGE_SIZE + bbox[0] + bbox[2] * 0.12
-        bbox[3] = bbox[3] * IMAGE_SIZE + bbox[1] + bbox[3] * 0.12
-        bbox = [int(x) for x in bbox]
+        print("pre-edit bbox: ", bbox)
+        # print(bbox[0])
+        # bbox[0] = bbox[0] * IMAGE_SIZE - bbox[2] * 0.12
+        # bbox[1] = bbox[1] * IMAGE_SIZE - bbox[3] * 0.12
+        # bbox[2] = bbox[2] * IMAGE_SIZE + bbox[0] + bbox[2] * 0.12
+        # bbox[3] = bbox[3] * IMAGE_SIZE + bbox[1] + bbox[3] * 0.12
+
+        bbox[0] = bbox[0] / orig_image * IMAGE_SIZE  # x-min
+        # print(bbox[0])
+        bbox[1] = bbox[1] / orig_image * IMAGE_SIZE  # y-min
+        bbox[2] = bbox[0] + (bbox[2] / orig_image * IMAGE_SIZE) # x-max (originally width)
+        bbox[3] = bbox[1] + (bbox[3] / orig_image * IMAGE_SIZE) # y-max (originally height)
+
+        # bbox = torchvision.ops.boxes.box_convert(bbox, 'xywh', 'xyxy')
+
+        bbox = [float(x) for x in bbox]
         area = bbox[2] * bbox[3]
+        print("post-edit bbox: ", bbox)
 
         labels = torch.as_tensor([int(data[0])], dtype=torch.int64)
 
@@ -176,13 +190,13 @@ def get_train_transform():
         A.RandomRotate90(p=1.0),
         A.RandomRain(),
         ToTensorV2(p=1.0)
-    ], bbox_params={'format': 'coco', 'label_fields': ['labels']})
+    ], bbox_params={'format': 'pascal_voc', 'label_fields': ['labels']})
 
 
 def get_valid_transform():
     return A.Compose([
         ToTensorV2(p=1.0)
-    ], bbox_params={'format': 'coco', 'label_fields': ['labels']})
+    ], bbox_params={'format': 'pascal_voc', 'label_fields': ['labels']})
 
 # load a model; pre-trained on COCO
 model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
@@ -229,7 +243,7 @@ train_data_loader = DataLoader(
     shuffle=True,
     collate_fn=collate_fn
 )
-print(train_data_loader)
+# print(train_data_loader)
 
 """
 test_data_loader = DataLoader(
@@ -246,11 +260,10 @@ valid_data_loader = DataLoader(
     shuffle=True,
     collate_fn=collate_fn
 )
-
 images, targets, image_ids = next(iter(train_data_loader))
-print(images.shape)
-print(targets)
-print(image_ids)
+# print(images.shape)
+# print(targets)
+# print(image_ids)
 images = list(image.to(device) for image in images)
 targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
