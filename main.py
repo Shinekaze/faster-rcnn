@@ -59,36 +59,55 @@ annotation_annotations = annotations['annotations']
 annotation_categories = annotations['categories']
 
 # print(annotations)
-print(annotation_info)
-print(annotation_images)
-print(annotation_annotations)
-print(annotation_categories)
+# print(annotation_info)
+# print(annotation_images)
+# print(annotation_annotations)
+# print(annotation_categories)
 
 class_dict = {}
+
 image_list = []
 label_list = []
 bbox_list = []
+iscrowd_list = []
+dataset = []
 
 for i in range(len(annotation_images)):
-    image_list.append(DATASET_PATH + annotation_images[i]['file_name'])
-    label_list.append(annotation_annotations[i]['category_id'])
-    bbox_list.append(annotation_annotations[i]['bbox'])
+    # image_list.append(DATASET_PATH + annotation_images[i]['file_name'])
+    # label_list.append(annotation_annotations[i]['category_id'])
+    # bbox_list.append(annotation_annotations[i]['bbox'])
+    # iscrowd_list.append(annotation_annotations[i]['iscrowd'])
+    label = annotation_annotations[i]['category_id']
+    box = annotation_annotations[i]['bbox']
+    image = DATASET_PATH + annotation_images[i]['file_name']
+    dataset.append((label, box, image))
 
-dataset = pd.DataFrame({
-    'image': image_list,
-    'label': label_list,
-    'bbox': bbox_list
-})
+'''
+target['boxes'] = torch.Tensor([bbox])
+target['labels'] = labels
+# target['masks'] = None
+target['image_id'] = torch.tensor([index])
+target['area'] = torch.Tensor([area])
+target['iscrowd'] = iscrowd
+'''
+
+# dataset = pd.DataFrame({
+#     'labels': label_list,
+#     'bbox': bbox_list,
+#     'image': image_list
+#     # 'iscrowd': iscrowd_list
+# })
 
 for i in range(len(annotation_categories)):
     class_dict[annotation_categories[i]['id']] = annotation_categories[i]['name']
 
 # print(class_dict)
-# print(dataset)
+# print(dataset.head())
 
-random.shuffle(dataset)
+# random.shuffle(dataset)
 # train_ds, test_ds, val_ds = utils.train_test_split_annotations(dataset, 0.6, 0)
-train_ds, test_ds = train_test_split(dataset, test_size=0.2)
+train_ds, test_ds = train_test_split(dataset, test_size=0.2, random_state=42)
+train_ds, val_ds = train_test_split(train_ds, test_size=0.1, random_state=42)
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -101,12 +120,16 @@ class MVTEC_Dataset(Dataset):
 
     def __getitem__(self, index: int):
         data = self.dataset[index]
+        print(data[2])
 
         image = cv2.imread(data[2])
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
         image /= 255.0
 
+        print(data[1])
+
         bbox = list(data[1])
+        print(bbox)
         bbox[0] = bbox[0] * IMAGE_SIZE - bbox[2] * 0.12
         bbox[1] = bbox[1] * IMAGE_SIZE - bbox[3] * 0.12
         bbox[2] = bbox[2] * IMAGE_SIZE + bbox[0] + bbox[2] * 0.12
@@ -153,13 +176,13 @@ def get_train_transform():
         A.RandomRotate90(p=1.0),
         A.RandomRain(),
         ToTensorV2(p=1.0)
-    ], bbox_params={'format': 'pascal_voc', 'label_fields': ['labels']})
+    ], bbox_params={'format': 'coco', 'label_fields': ['labels']})
 
 
 def get_valid_transform():
     return A.Compose([
         ToTensorV2(p=1.0)
-    ], bbox_params={'format': 'pascal_voc', 'label_fields': ['labels']})
+    ], bbox_params={'format': 'coco', 'label_fields': ['labels']})
 
 # load a model; pre-trained on COCO
 model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
@@ -206,6 +229,7 @@ train_data_loader = DataLoader(
     shuffle=True,
     collate_fn=collate_fn
 )
+print(train_data_loader)
 
 """
 test_data_loader = DataLoader(
@@ -224,6 +248,9 @@ valid_data_loader = DataLoader(
 )
 
 images, targets, image_ids = next(iter(train_data_loader))
+print(images.shape)
+print(targets)
+print(image_ids)
 images = list(image.to(device) for image in images)
 targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
