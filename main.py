@@ -109,7 +109,10 @@ for i in range(len(annotation_categories)):
 train_ds, test_ds = train_test_split(dataset, test_size=0.2, random_state=42)
 train_ds, val_ds = train_test_split(train_ds, test_size=0.1, random_state=42)
 
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+if torch.cuda.is_available():
+    device = torch.device('cuda')
+else:
+    torch.device('cpu')
 
 class MVTEC_Dataset(Dataset):
     def __init__(self, dataset, transforms=None):
@@ -339,7 +342,7 @@ model.eval()
 cpu_device = torch.device("cpu")
 
 outputs = model(images)
-outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
+outputs = [{k: v.to(device) for k, v in t.items()} for t in outputs]
 
 boxes = [outputs[0]['boxes'][0].detach().numpy().astype(np.int32)]
 label = class_dict[outputs[0]['labels'].detach().numpy()[0]]
