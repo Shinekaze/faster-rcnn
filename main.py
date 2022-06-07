@@ -295,15 +295,18 @@ loss_hist = Averager()
 itr = 1
 
 for epoch in range(num_epochs):
+    print("Epoch: ", epoch)
     loss_hist.reset()
 
     for images, targets, image_ids in train_data_loader:
+        # print("stage 1, epoch {}".format(epoch))
 
         images = list(image.to(device) for image in images)
+        # print("stage 2, epoch {}".format(epoch))
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-
+        # print("stage 3, epoch {}".format(epoch))
         loss_dict = model(images, targets)
-
+        # print("stage 4, epoch {}".format(epoch))
         losses = sum(loss for loss in loss_dict.values())
         loss_value = losses.item()
 
